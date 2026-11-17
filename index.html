@@ -183,8 +183,8 @@
             text-align: center;
         }
 
-        .hidden { 
-            display: none !important; 
+        .hidden {
+            display: none !important;
         }
 
         /* Loading Overlay */
@@ -389,7 +389,7 @@
                 <button onclick="saveText()">Save Text</button>
 
                 <div class="divider"></div>
-                
+
                 <button class="secondary" onclick="openBox()">Open Box</button>
                 <div class="stats" id="localCount">Local: 0 texts</div>
             </div>
@@ -493,8 +493,12 @@
                 throw new Error('HTTP ' + response.status);
             }
             const text = await response.text();
-            const cleanText = text.replace(/^[^\{]*/, '').replace(/[^\}]*$/, '') || text;
-            return JSON.parse(cleanText);
+            const firstBrace = text.indexOf('{');
+            const lastBrace = text.lastIndexOf('}');
+            if (firstBrace === -1 || lastBrace < firstBrace) {
+                throw new Error('Invalid server response');
+            }
+            return JSON.parse(text.slice(firstBrace, lastBrace + 1));
         }
 
         async function doSignup() {
@@ -630,11 +634,11 @@
             if(!text) return;
 
             const now = new Date();
-            const timestamp = now.getFullYear() + '-' + 
-                String(now.getMonth()+1).padStart(2,'0') + '-' + 
-                String(now.getDate()).padStart(2,'0') + ' ' + 
-                String(now.getHours()).padStart(2,'0') + ':' + 
-                String(now.getMinutes()).padStart(2,'0') + ':' + 
+            const timestamp = now.getFullYear() + '-' +
+                String(now.getMonth()+1).padStart(2,'0') + '-' +
+                String(now.getDate()).padStart(2,'0') + ' ' +
+                String(now.getHours()).padStart(2,'0') + ':' +
+                String(now.getMinutes()).padStart(2,'0') + ':' +
                 String(now.getSeconds()).padStart(2,'0');
 
             const entry = { text: text, timestamp: timestamp, synced: false };
@@ -716,7 +720,7 @@
         function updateLocalCount() {
             const unsynced = localTexts.filter(t => !t.synced).length;
             const total = localTexts.length;
-            document.getElementById('localCount').textContent = 
+            document.getElementById('localCount').textContent =
                 'Local: ' + total + ' texts' + (unsynced > 0 ? ' (' + unsynced + ' unsynced)' : '');
         }
 
@@ -745,6 +749,38 @@
                 setTimeout(() => toast.remove(), 500);
             }, 2000);
         }
+
+        // Keyboard support: Enter advances to the next field or submits the current step.
+        document.addEventListener('keydown', function(event) {
+            if (event.key !== 'Enter' || event.isComposing) return;
+
+            const inputId = event.target && event.target.id;
+            const enterActions = {
+                signupUser: function() {
+                    const password = document.getElementById('signupPass');
+                    if (!password.value) password.focus();
+                    else doSignup();
+                },
+                signupPass: doSignup,
+                loginUser: function() {
+                    const password = document.getElementById('loginPass');
+                    if (!password.value) password.focus();
+                    else doLogin();
+                },
+                loginPass: doLogin,
+                newPasscode: function() {
+                    document.getElementById('confirmPasscode').focus();
+                },
+                confirmPasscode: doSetPasscode,
+                verifyPasscode: doVerifyPasscode
+            };
+
+            const action = enterActions[inputId];
+            if (action) {
+                event.preventDefault();
+                action();
+            }
+        });
 
         window.onload = function() {
             if(currentUser) {
